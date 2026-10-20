@@ -1,31 +1,57 @@
 /* =========================================================
    WordSmart — Application Logic
-   Clean state management with localStorage persistence.
+   - Cross-book navigation (WS1 -> WS2 seamlessly)
+   - Combined progress across both books (total: 1654)
+   - Global word counter (e.g. "427 / 1654")
+   - localStorage persistence
    ========================================================= */
 
+// ── CONSTANTS ──
+const STORAGE_KEY = 'wordsmart_v3';
+const WS1_LEN = () => VOCAB_DATA.ws1.length; // 827
+const WS2_LEN = () => VOCAB_DATA.ws2.length; // 827
+const TOTAL   = () => WS1_LEN() + WS2_LEN(); // 1654
+
 // ── STATE ──
+// book:  'ws1' | 'ws2'
+// index: position in the ORDER[book] array
 const STATE = {
-  book:    'ws1',       // active book: 'ws1' | 'ws2'
-  index:   0,           // position within the current order array
+  book:    'ws1',
+  index:   0,
   view:    'flashcard', // 'flashcard' | 'list'
   flipped: false,
 };
 
-// Per-book position memory (persisted separately from STATE)
+// Per-book saved positions
 const BOOK_INDEX = { ws1: 0, ws2: 0 };
 
-// Covered words: { ws1: { wordId: true, ... }, ws2: { ... } }
+// Covered words: { ws1: { id: true, ... }, ws2: { ... } }
 const COVERED = { ws1: {}, ws2: {} };
 
-// Display order (indices into VOCAB_DATA[book])
+// Display order (array of indices into VOCAB_DATA[book]).
+// Sequential by default; shuffled on user request.
 const ORDER = { ws1: [], ws2: [] };
 
-const STORAGE_KEY = 'wordsmart_v2';
+// ── HELPERS ──
+function data()        { return VOCAB_DATA[STATE.book]; }
+function currentWord() { return data()[ORDER[STATE.book][STATE.index]]; }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function initOrder(book) {
+  ORDER[book] = Array.from({ length: VOCAB_DATA[book].length }, (_, i) => i);
+}
+
+// Global sequential position across both books (1-based for display)
+function globalPosition() {
+  return STATE.book === 'ws1'
+    ? STATE.index + 1
+    : WS1_LEN() + STATE.index + 1;
+}
 
 // ── PERSISTENCE ──
 function persist() {
+  BOOK_INDEX[STATE.book] = STATE.index;
   try {
-    BOOK_INDEX[STATE.book] = STATE.index;
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       covered:   COVERED,
       bookIndex: { ws1: BOOK_INDEX.ws1, ws2: BOOK_INDEX.ws2 },
@@ -42,53 +68,43 @@ function hydrate() {
     const s = JSON.parse(raw);
     if (s.covered?.ws1) COVERED.ws1 = s.covered.ws1;
     if (s.covered?.ws2) COVERED.ws2 = s.covered.ws2;
-    if (s.bookIndex?.ws1 != null) BOOK_INDEX.ws1 = s.bookIndex.ws1;
-    if (s.bookIndex?.ws2 != null) BOOK_INDEX.ws2 = s.bookIndex.ws2;
+    if (s.bookIndex?.ws1 != null) BOOK_INDEX.ws1 = Number(s.bookIndex.ws1) || 0;
+    if (s.bookIndex?.ws2 != null) BOOK_INDEX.ws2 = Number(s.bookIndex.ws2) || 0;
     if (s.book) STATE.book = s.book;
     if (s.theme) document.documentElement.setAttribute('data-theme', s.theme);
   } catch (_) {}
 }
 
-// ── HELPERS ──
-function data()        { return VOCAB_DATA[STATE.book]; }
-function currentWord() { return data()[ORDER[STATE.book][STATE.index]]; }
-
-function initOrder(book) {
-  ORDER[book] = Array.from({ length: VOCAB_DATA[book].length }, (_, i) => i);
-}
-
-function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
-
 // ── DOM REFS ──
 const $ = (id) => document.getElementById(id);
 const EL = {
-  cardBody:     $('card-body'),
-  cardWord:     $('card-word'),
-  cardBadge:    $('card-badge'),
-  backDef:      $('back-definition'),
-  backBangla:   $('back-bangla'),
-  backPhrases:  $('back-phrases'),
-  cardIndex:    $('card-index'),
-  cardTotal:    $('card-total'),
-  progressFill: $('progress-fill'),
-  progressPct:  $('progress-pct'),
-  progressCount:$('progress-count'),
-  coveredBtn:   $('covered-btn'),
-  coveredBtnTxt:$('covered-btn-text'),
-  coveredList:  $('covered-list'),
-  coveredEmpty: $('covered-list-empty'),
-  listStats:    $('list-stats'),
-  flashcardView:$('flashcard-view'),
-  listView:     $('list-view'),
-  tabWs1:       $('tab-ws1'),
-  tabWs2:       $('tab-ws2'),
-  prevBtn:      $('prev-btn'),
-  nextBtn:      $('next-btn'),
-  toast:        $('toast'),
-  iconGrid:     $('icon-grid'),
-  iconCard:     $('icon-card'),
-  iconMoon:     $('icon-moon'),
-  iconSun:      $('icon-sun'),
+  cardBody:      $('card-body'),
+  cardWord:      $('card-word'),
+  cardBadge:     $('card-badge'),
+  backDef:       $('back-definition'),
+  backBangla:    $('back-bangla'),
+  backPhrases:   $('back-phrases'),
+  cardIndex:     $('card-index'),
+  cardTotal:     $('card-total'),
+  progressFill:  $('progress-fill'),
+  progressPct:   $('progress-pct'),
+  progressCount: $('progress-count'),
+  coveredBtn:    $('covered-btn'),
+  coveredBtnTxt: $('covered-btn-text'),
+  coveredList:   $('covered-list'),
+  coveredEmpty:  $('covered-list-empty'),
+  listStats:     $('list-stats'),
+  flashcardView: $('flashcard-view'),
+  listView:      $('list-view'),
+  tabWs1:        $('tab-ws1'),
+  tabWs2:        $('tab-ws2'),
+  prevBtn:       $('prev-btn'),
+  nextBtn:       $('next-btn'),
+  toast:         $('toast'),
+  iconGrid:      $('icon-grid'),
+  iconCard:      $('icon-card'),
+  iconMoon:      $('icon-moon'),
+  iconSun:       $('icon-sun'),
 };
 
 // ── RENDER CARD ──
@@ -96,41 +112,40 @@ function renderCard() {
   const word = currentWord();
   if (!word) return;
 
-  // Unflip before showing new word
+  // Always unflip when showing a new card
   if (STATE.flipped) {
     STATE.flipped = false;
     EL.cardBody.classList.remove('flipped');
   }
 
-  // Front
+  // Front content
   EL.cardBadge.textContent = STATE.book === 'ws1' ? 'Word Smart 1' : 'Word Smart 2';
   EL.cardWord.textContent  = word.word;
 
-  // Word enter animation
+  // Animate word in
   EL.cardWord.classList.remove('word-enter');
-  void EL.cardWord.offsetWidth; // force reflow
+  void EL.cardWord.offsetWidth;
   EL.cardWord.classList.add('word-enter');
 
-  // Back
+  // Back content
   EL.backDef.textContent    = word.definition;
   EL.backBangla.textContent = word.bangla;
-  EL.backPhrases.innerHTML  = word.phrases
-    .map(p => `<li>${esc(p)}</li>`)
-    .join('');
+  EL.backPhrases.innerHTML  = word.phrases.map(p => `<li>${esc(p)}</li>`).join('');
 
-  // Counter
-  const total = data().length;
-  EL.cardIndex.textContent = STATE.index + 1;
-  EL.cardTotal.textContent = total;
+  // Global counter — shows position across ALL 1654 words
+  EL.cardIndex.textContent = globalPosition();
+  EL.cardTotal.textContent = TOTAL();
 
-  // Navigation buttons
-  EL.prevBtn.disabled = STATE.index === 0;
-  EL.nextBtn.disabled = STATE.index === total - 1;
+  // Nav button disabled states
+  // Prev disabled only at very first word (WS1, index 0)
+  // Next disabled only at very last word (WS2, last index)
+  EL.prevBtn.disabled = (STATE.book === 'ws1' && STATE.index === 0);
+  EL.nextBtn.disabled = (STATE.book === 'ws2' && STATE.index === WS2_LEN() - 1);
 
   // Covered button state
-  const isCovered = !!COVERED[STATE.book][word.id];
-  EL.coveredBtn.classList.toggle('is-covered', isCovered);
-  EL.coveredBtnTxt.textContent = isCovered ? 'Covered' : 'Mark as Covered';
+  const covered = !!COVERED[STATE.book][word.id];
+  EL.coveredBtn.classList.toggle('is-covered', covered);
+  EL.coveredBtnTxt.textContent = covered ? 'Covered' : 'Mark as Covered';
 
   updateProgress();
   persist();
@@ -144,10 +159,10 @@ function esc(str) {
     .replace(/"/g, '&quot;');
 }
 
-// ── PROGRESS ──
+// ── PROGRESS — combined across both books ──
 function updateProgress() {
-  const total   = data().length;
-  const covered = Object.keys(COVERED[STATE.book]).length;
+  const total   = TOTAL();
+  const covered = Object.keys(COVERED.ws1).length + Object.keys(COVERED.ws2).length;
   const pct     = total ? Math.round((covered / total) * 100) : 0;
   EL.progressFill.style.width  = pct + '%';
   EL.progressPct.textContent   = pct + '%';
@@ -160,14 +175,61 @@ function flipCard() {
   EL.cardBody.classList.toggle('flipped', STATE.flipped);
 }
 
-// ── NAVIGATE ──
+// ── NAVIGATE — crosses from WS1 to WS2 and back ──
 function navigate(dir) {
-  const len    = data().length;
-  const newIdx = clamp(STATE.index + dir, 0, len - 1);
-  if (newIdx === STATE.index) return;
-  STATE.index              = newIdx;
-  BOOK_INDEX[STATE.book]   = newIdx;
-  renderCard();
+  if (dir === 1) {
+    // Moving forward
+    if (STATE.book === 'ws1') {
+      if (STATE.index < WS1_LEN() - 1) {
+        // Normal forward within WS1
+        STATE.index++;
+        BOOK_INDEX.ws1 = STATE.index;
+        renderCard();
+      } else {
+        // End of WS1 → jump to start of WS2
+        BOOK_INDEX.ws1 = STATE.index;
+        STATE.book  = 'ws2';
+        STATE.index = 0;
+        BOOK_INDEX.ws2 = 0;
+        syncTabs();
+        renderCard();
+      }
+    } else {
+      // Within WS2
+      if (STATE.index < WS2_LEN() - 1) {
+        STATE.index++;
+        BOOK_INDEX.ws2 = STATE.index;
+        renderCard();
+      }
+      // At end of WS2 — next button should be disabled (handled in renderCard)
+    }
+  } else {
+    // Moving backward
+    if (STATE.book === 'ws2') {
+      if (STATE.index > 0) {
+        // Normal back within WS2
+        STATE.index--;
+        BOOK_INDEX.ws2 = STATE.index;
+        renderCard();
+      } else {
+        // Start of WS2 → jump to end of WS1
+        BOOK_INDEX.ws2 = 0;
+        STATE.book  = 'ws1';
+        STATE.index = WS1_LEN() - 1;
+        BOOK_INDEX.ws1 = STATE.index;
+        syncTabs();
+        renderCard();
+      }
+    } else {
+      // Within WS1
+      if (STATE.index > 0) {
+        STATE.index--;
+        BOOK_INDEX.ws1 = STATE.index;
+        renderCard();
+      }
+      // At start of WS1 — prev button should be disabled
+    }
+  }
 }
 
 // ── MARK COVERED ──
@@ -186,24 +248,27 @@ function markCovered() {
   if (STATE.view === 'list') renderListView();
 }
 
-// ── SWITCH BOOK ──
+// ── SWITCH BOOK (tab click) ──
 function switchBook(book) {
   if (STATE.book === book) return;
   BOOK_INDEX[STATE.book] = STATE.index;
   STATE.book  = book;
   STATE.index = clamp(BOOK_INDEX[book], 0, VOCAB_DATA[book].length - 1);
-
-  EL.tabWs1.classList.toggle('active', book === 'ws1');
-  EL.tabWs2.classList.toggle('active', book === 'ws2');
-  EL.tabWs1.setAttribute('aria-selected', String(book === 'ws1'));
-  EL.tabWs2.setAttribute('aria-selected', String(book === 'ws2'));
-
+  syncTabs();
   if (STATE.view === 'list') {
     renderListView();
     updateProgress();
   } else {
-    renderCard(); // renderCard calls updateProgress internally
+    renderCard();
   }
+}
+
+// Update tab button classes and aria attributes
+function syncTabs() {
+  EL.tabWs1.classList.toggle('active', STATE.book === 'ws1');
+  EL.tabWs2.classList.toggle('active', STATE.book === 'ws2');
+  EL.tabWs1.setAttribute('aria-selected', String(STATE.book === 'ws1'));
+  EL.tabWs2.setAttribute('aria-selected', String(STATE.book === 'ws2'));
 }
 
 // ── SHUFFLE ──
@@ -221,12 +286,14 @@ function shuffleCards() {
 
 // ── RESET ──
 function resetProgress() {
-  const bookName = STATE.book === 'ws1' ? '1' : '2';
-  if (!confirm(`Reset all covered words for Word Smart ${bookName}? This cannot be undone.`)) return;
-  COVERED[STATE.book]    = {};
-  STATE.index            = 0;
-  BOOK_INDEX[STATE.book] = 0;
-  initOrder(STATE.book);
+  if (!confirm('Reset all covered words for both books? This cannot be undone.')) return;
+  COVERED.ws1 = {};
+  COVERED.ws2 = {};
+  STATE.index = 0;
+  BOOK_INDEX.ws1 = 0;
+  BOOK_INDEX.ws2 = 0;
+  initOrder('ws1');
+  initOrder('ws2');
   renderCard();
   if (STATE.view === 'list') renderListView();
   showToast('Progress reset');
@@ -238,7 +305,6 @@ function toggleView() {
     STATE.view = 'list';
     EL.flashcardView.classList.add('hidden');
     EL.listView.classList.remove('hidden');
-    // Swap icons
     EL.iconGrid.classList.add('hidden');
     EL.iconCard.classList.remove('hidden');
     renderListView();
@@ -246,7 +312,6 @@ function toggleView() {
     STATE.view = 'flashcard';
     EL.listView.classList.add('hidden');
     EL.flashcardView.classList.remove('hidden');
-    // Swap icons
     EL.iconCard.classList.add('hidden');
     EL.iconGrid.classList.remove('hidden');
   }
@@ -254,9 +319,10 @@ function toggleView() {
 
 // ── RENDER LIST VIEW ──
 function renderListView() {
-  const coveredIds = COVERED[STATE.book];
-  const all        = VOCAB_DATA[STATE.book];
-  const entries    = all.filter(w => coveredIds[w.id]);
+  // Show covered words from BOTH books in the list view
+  const ws1Entries = VOCAB_DATA.ws1.filter(w => COVERED.ws1[w.id]);
+  const ws2Entries = VOCAB_DATA.ws2.filter(w => COVERED.ws2[w.id]);
+  const entries    = [...ws1Entries, ...ws2Entries];
   const count      = entries.length;
 
   EL.listStats.textContent = `${count} word${count !== 1 ? 's' : ''}`;
@@ -267,56 +333,55 @@ function renderListView() {
     return;
   }
 
-  const bookLabel = STATE.book === 'ws1' ? 'WS1' : 'WS2';
-  EL.coveredList.innerHTML = entries.map(w => `
-    <div class="covered-card"
-         role="button"
-         tabindex="0"
-         aria-label="Go to flashcard: ${esc(w.word)}"
-         onclick="goToCard('${esc(w.id)}')"
-         onkeydown="if(event.key==='Enter')goToCard('${esc(w.id)}')">
-      <span class="covered-card-book">${bookLabel}</span>
-      <div class="covered-card-word">${esc(w.word)}</div>
-      <div class="covered-card-def">${esc(w.definition)}</div>
-      <div class="covered-card-goto">Open flashcard &rarr;</div>
-    </div>
-  `).join('');
+  EL.coveredList.innerHTML = entries.map(w => {
+    // Determine book from id prefix
+    const book      = w.id.startsWith('ws1') ? 'ws1' : 'ws2';
+    const bookLabel = book === 'ws1' ? 'WS1' : 'WS2';
+    return `
+      <div class="covered-card"
+           role="button"
+           tabindex="0"
+           aria-label="Go to flashcard: ${esc(w.word)}"
+           onclick="goToCard('${esc(w.id)}')"
+           onkeydown="if(event.key==='Enter')goToCard('${esc(w.id)}')">
+        <span class="covered-card-book">${bookLabel}</span>
+        <div class="covered-card-word">${esc(w.word)}</div>
+        <div class="covered-card-def">${esc(w.definition)}</div>
+        <div class="covered-card-goto">Open flashcard &rarr;</div>
+      </div>`;
+  }).join('');
 }
 
 // ── GO TO CARD FROM LIST ──
 function goToCard(wordId) {
-  // Determine which book contains this word
+  // Find book and raw data index
   let targetBook = null;
   let rawIdx     = -1;
-
   for (const book of ['ws1', 'ws2']) {
     const idx = VOCAB_DATA[book].findIndex(w => w.id === wordId);
     if (idx !== -1) { targetBook = book; rawIdx = idx; break; }
   }
   if (!targetBook || rawIdx === -1) return;
 
-  // Find position within current ORDER array
+  // Find position in ORDER (accounts for shuffled order)
   const orderIdx = ORDER[targetBook].indexOf(rawIdx);
   if (orderIdx === -1) return;
 
-  // Switch view first
+  // Switch to flashcard view, update icons
   STATE.view = 'flashcard';
   EL.listView.classList.add('hidden');
   EL.flashcardView.classList.remove('hidden');
   EL.iconCard.classList.add('hidden');
   EL.iconGrid.classList.remove('hidden');
 
-  // Switch book if needed (update tabs only, don't re-render yet)
+  // Update book if necessary (tabs only, no extra renderCard)
   if (STATE.book !== targetBook) {
     BOOK_INDEX[STATE.book] = STATE.index;
     STATE.book = targetBook;
-    EL.tabWs1.classList.toggle('active', targetBook === 'ws1');
-    EL.tabWs2.classList.toggle('active', targetBook === 'ws2');
-    EL.tabWs1.setAttribute('aria-selected', String(targetBook === 'ws1'));
-    EL.tabWs2.setAttribute('aria-selected', String(targetBook === 'ws2'));
+    syncTabs();
   }
 
-  // Set index and render
+  // Set index and render once
   STATE.index              = orderIdx;
   BOOK_INDEX[targetBook]   = orderIdx;
   renderCard();
@@ -328,7 +393,6 @@ function toggleTheme() {
   const html   = document.documentElement;
   const isDark = html.getAttribute('data-theme') === 'dark';
   html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-  // Swap icons
   EL.iconMoon.classList.toggle('hidden', isDark);
   EL.iconSun.classList.toggle('hidden', !isDark);
   persist();
@@ -346,9 +410,7 @@ function showToast(msg) {
 
 // ── KEYBOARD SHORTCUTS ──
 document.addEventListener('keydown', (e) => {
-  // Don't hijack input fields
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
-
   switch (e.key) {
     case 'ArrowLeft':
       if (STATE.view === 'flashcard') navigate(-1);
@@ -381,7 +443,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ── SYNC INITIAL THEME ICONS ──
+// ── SYNC THEME ICON ON LOAD ──
 function syncThemeIcon() {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   EL.iconMoon.classList.toggle('hidden', !isDark);
@@ -390,28 +452,20 @@ function syncThemeIcon() {
 
 // ── INIT ──
 function init() {
-  // Build sequential order arrays for both books
+  // Build sequential order for both books
   initOrder('ws1');
   initOrder('ws2');
 
-  // Load persisted state (overrides defaults above)
+  // Restore persisted state
   hydrate();
 
-  // Clamp restored indices in case data size changed
-  STATE.index    = clamp(BOOK_INDEX[STATE.book], 0, VOCAB_DATA[STATE.book].length - 1);
+  // Clamp indices in case data changed since last save
   BOOK_INDEX.ws1 = clamp(BOOK_INDEX.ws1, 0, VOCAB_DATA.ws1.length - 1);
   BOOK_INDEX.ws2 = clamp(BOOK_INDEX.ws2, 0, VOCAB_DATA.ws2.length - 1);
+  STATE.index    = clamp(BOOK_INDEX[STATE.book], 0, VOCAB_DATA[STATE.book].length - 1);
 
-  // Sync tab UI
-  EL.tabWs1.classList.toggle('active', STATE.book === 'ws1');
-  EL.tabWs2.classList.toggle('active', STATE.book === 'ws2');
-  EL.tabWs1.setAttribute('aria-selected', String(STATE.book === 'ws1'));
-  EL.tabWs2.setAttribute('aria-selected', String(STATE.book === 'ws2'));
-
-  // Sync theme icon
+  syncTabs();
   syncThemeIcon();
-
-  // Render first card
   renderCard();
 }
 
