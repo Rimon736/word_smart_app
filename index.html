@@ -29,6 +29,16 @@
     </nav>
 
     <div class="header-actions">
+      <!-- Sync Status & Auth Button -->
+      <button id="auth-btn" class="auth-btn" onclick="openAuthModal()" aria-label="Account and cloud sync">
+        <span id="sync-dot" class="sync-dot"></span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+        <span id="auth-btn-label">Sign In</span>
+      </button>
+
       <button id="view-toggle-btn" class="icon-btn" onclick="toggleView()" title="Toggle view" aria-label="Toggle flashcard or list view">
         <svg id="icon-grid" xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
@@ -190,9 +200,103 @@
 
   </main>
 
+  <!-- ===== AUTH & CLOUD MODAL ===== -->
+  <div id="auth-modal" class="modal-backdrop hidden" onclick="if(event.target===this) closeAuthModal()">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-header">
+        <h3 id="modal-title" class="modal-title">Cloud Account</h3>
+        <button class="modal-close-btn" onclick="closeAuthModal()" aria-label="Close modal">&times;</button>
+      </div>
+
+      <!-- Logged-in View -->
+      <div id="auth-user-view" class="modal-body hidden">
+        <div class="user-profile-badge">
+          <div class="user-avatar-circle">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+          <div class="user-profile-info">
+            <div id="user-email-display" class="user-email">user@example.com</div>
+            <div id="cloud-sync-status" class="sync-status-text">
+              <span class="sync-indicator-dot synced"></span> Progress is synced across devices
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-btn-row">
+          <button class="btn btn-secondary" onclick="manualSync()" id="manual-sync-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+            Sync Now
+          </button>
+          <button class="btn btn-ghost" onclick="signOutUser()">Sign Out</button>
+        </div>
+      </div>
+
+      <!-- Logged-out / Auth Form View -->
+      <div id="auth-form-view" class="modal-body">
+        <div class="modal-tabs">
+          <button id="tab-signin" class="modal-tab-btn active" onclick="setAuthTab('signin')">Sign In</button>
+          <button id="tab-signup" class="modal-tab-btn" onclick="setAuthTab('signup')">Sign Up</button>
+          <button id="tab-config" class="modal-tab-btn" onclick="setAuthTab('config')">Supabase Config</button>
+        </div>
+
+        <!-- Sign In & Sign Up Form -->
+        <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+          <div id="auth-alert" class="auth-alert hidden"></div>
+
+          <div class="form-group">
+            <label for="auth-email" class="form-label">Email Address</label>
+            <input type="email" id="auth-email" class="form-input" placeholder="you@example.com" required autocomplete="email" />
+          </div>
+
+          <div class="form-group">
+            <label for="auth-password" class="form-label">Password</label>
+            <input type="password" id="auth-password" class="form-input" placeholder="••••••••" required autocomplete="current-password" minlength="6" />
+          </div>
+
+          <button type="submit" id="auth-submit-btn" class="btn btn-primary btn-block">
+            Sign In
+          </button>
+          <p class="auth-footnote" id="auth-footnote">
+            Progress is automatically saved and synced whenever you change cards or mark words.
+          </p>
+        </form>
+
+        <!-- Supabase Settings Sub-panel -->
+        <div id="config-panel" class="config-panel hidden">
+          <p class="config-desc">
+            Connect to your Supabase project to enable email authentication and cross-device sync.
+          </p>
+          <div class="form-group">
+            <label for="cfg-sb-url" class="form-label">Project URL</label>
+            <input type="url" id="cfg-sb-url" class="form-input" placeholder="https://your-project.supabase.co" />
+          </div>
+          <div class="form-group">
+            <label for="cfg-sb-key" class="form-label">Anon / Public Key</label>
+            <input type="password" id="cfg-sb-key" class="form-input" placeholder="eyJhbGciOi..." />
+          </div>
+          <div class="modal-btn-row">
+            <button type="button" class="btn btn-primary" onclick="saveSupabaseConfig()">Save Credentials</button>
+            <button type="button" class="btn btn-ghost" onclick="setAuthTab('signin')">Back</button>
+          </div>
+          <div class="config-guide">
+            <small>Need to set up Supabase? Run the script in <code>supabase_setup.sql</code> in your Supabase SQL editor.</small>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST -->
   <div id="toast" class="toast" role="alert" aria-live="polite"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
   <script src="sourceData.js"></script>
   <script src="data.js"></script>
   <script src="app.js"></script>

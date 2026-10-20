@@ -59,6 +59,11 @@ function persist() {
       theme:     document.documentElement.getAttribute('data-theme'),
     }));
   } catch (_) {}
+
+  // Automatically sync to cloud if user is signed in
+  if (typeof scheduleCloudSync === 'function') {
+    scheduleCloudSync();
+  }
 }
 
 function hydrate() {
@@ -78,33 +83,54 @@ function hydrate() {
 // ── DOM REFS ──
 const $ = (id) => document.getElementById(id);
 const EL = {
-  cardBody:      $('card-body'),
-  cardWord:      $('card-word'),
-  cardBadge:     $('card-badge'),
-  backDef:       $('back-definition'),
-  backBangla:    $('back-bangla'),
-  backPhrases:   $('back-phrases'),
-  cardIndex:     $('card-index'),
-  cardTotal:     $('card-total'),
-  progressFill:  $('progress-fill'),
-  progressPct:   $('progress-pct'),
-  progressCount: $('progress-count'),
-  coveredBtn:    $('covered-btn'),
-  coveredBtnTxt: $('covered-btn-text'),
-  coveredList:   $('covered-list'),
-  coveredEmpty:  $('covered-list-empty'),
-  listStats:     $('list-stats'),
-  flashcardView: $('flashcard-view'),
-  listView:      $('list-view'),
-  tabWs1:        $('tab-ws1'),
-  tabWs2:        $('tab-ws2'),
-  prevBtn:       $('prev-btn'),
-  nextBtn:       $('next-btn'),
-  toast:         $('toast'),
-  iconGrid:      $('icon-grid'),
-  iconCard:      $('icon-card'),
-  iconMoon:      $('icon-moon'),
-  iconSun:       $('icon-sun'),
+  cardBody:         $('card-body'),
+  cardWord:         $('card-word'),
+  cardBadge:        $('card-badge'),
+  backDef:          $('back-definition'),
+  backBangla:       $('back-bangla'),
+  backPhrases:      $('back-phrases'),
+  cardIndex:        $('card-index'),
+  cardTotal:        $('card-total'),
+  progressFill:     $('progress-fill'),
+  progressPct:      $('progress-pct'),
+  progressCount:    $('progress-count'),
+  coveredBtn:       $('covered-btn'),
+  coveredBtnTxt:    $('covered-btn-text'),
+  coveredList:      $('covered-list'),
+  coveredEmpty:     $('covered-list-empty'),
+  listStats:        $('list-stats'),
+  flashcardView:    $('flashcard-view'),
+  listView:         $('list-view'),
+  tabWs1:           $('tab-ws1'),
+  tabWs2:           $('tab-ws2'),
+  prevBtn:          $('prev-btn'),
+  nextBtn:          $('next-btn'),
+  toast:            $('toast'),
+  iconGrid:         $('icon-grid'),
+  iconCard:         $('icon-card'),
+  iconMoon:         $('icon-moon'),
+  iconSun:          $('icon-sun'),
+  // Auth & Cloud Elements
+  authBtn:          $('auth-btn'),
+  authBtnLabel:     $('auth-btn-label'),
+  syncDot:          $('sync-dot'),
+  authModal:        $('auth-modal'),
+  authUserView:     $('auth-user-view'),
+  authFormView:     $('auth-form-view'),
+  userEmailDisplay: $('user-email-display'),
+  cloudSyncStatus:  $('cloud-sync-status'),
+  authAlert:        $('auth-alert'),
+  authForm:         $('auth-form'),
+  authEmail:        $('auth-email'),
+  authPassword:     $('auth-password'),
+  authSubmitBtn:    $('auth-submit-btn'),
+  authFootnote:     $('auth-footnote'),
+  configPanel:      $('config-panel'),
+  cfgSbUrl:         $('cfg-sb-url'),
+  cfgSbKey:         $('cfg-sb-key'),
+  tabSignin:        $('tab-signin'),
+  tabSignup:        $('tab-signup'),
+  tabConfig:        $('tab-config'),
 };
 
 // ── RENDER CARD ──
@@ -127,10 +153,10 @@ function renderCard() {
   void EL.cardWord.offsetWidth;
   EL.cardWord.classList.add('word-enter');
 
-  // Back content
+  // Back content with target word highlighted in example sentences
   EL.backDef.textContent    = word.definition;
   EL.backBangla.textContent = word.bangla;
-  EL.backPhrases.innerHTML  = word.phrases.map(p => `<li>${esc(p)}</li>`).join('');
+  EL.backPhrases.innerHTML  = word.phrases.map(p => `<li>${highlightWord(p, word.word)}</li>`).join('');
 
   // Global counter — shows position across ALL 1654 words
   EL.cardIndex.textContent = globalPosition();
@@ -157,6 +183,57 @@ function esc(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+// ── HIGHLIGHT WORD IN EXAMPLES ──
+function highlightWord(text, rawWord) {
+  if (!text) return '';
+  const escapedText = esc(text);
+  if (!rawWord) return escapedText;
+
+  const cleanWord = rawWord.trim().toLowerCase().replace(/[`'"]+$/g, '');
+  const escRegex = (s) => s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+
+  const forms = new Set();
+  forms.add(escRegex(cleanWord));
+  forms.add(escRegex(cleanWord) + '(?:s|es|ed|ing|d|r|rs|ly|ness|ment|tion|tions|able)?');
+
+  if (cleanWord.endsWith('e') && cleanWord.length > 3) {
+    const base = escRegex(cleanWord.slice(0, -1));
+    forms.add(base + '(?:e|ed|es|ing|ion|ions|ive|ly|ment|al|ation|ations|able|ibility|or|ors|er|ers)');
+  }
+  if (cleanWord.endsWith('y') && cleanWord.length > 3) {
+    const base = escRegex(cleanWord.slice(0, -1));
+    forms.add(base + '(?:y|ies|ied|ying|i(?:st|stic|fication|ly|ness)?)');
+  }
+  if (cleanWord.endsWith('ent') && cleanWord.length > 4) {
+    const base = escRegex(cleanWord.slice(0, -3));
+    forms.add(base + '(?:ent|ence|ency|ently|ain|ained|aining)');
+  }
+  if (cleanWord.endsWith('ant') && cleanWord.length > 4) {
+    const base = escRegex(cleanWord.slice(0, -3));
+    forms.add(base + '(?:ant|ance|ancy|antly)');
+  }
+  if (cleanWord.endsWith('ious') && cleanWord.length > 5) {
+    const base = escRegex(cleanWord.slice(0, -4));
+    forms.add(base + '(?:ious|iously|iousness|y)');
+  }
+  if (cleanWord.endsWith('ation') && cleanWord.length > 6) {
+    const base = escRegex(cleanWord.slice(0, -5));
+    forms.add(base + '(?:ation|ations|ed|ing|s|e)');
+  }
+  if (cleanWord.endsWith('ic') && cleanWord.length > 4) {
+    const base = escRegex(cleanWord.slice(0, -2));
+    forms.add(base + '(?:ic|ical|ically|ics)');
+  }
+
+  const lastChar = cleanWord.slice(-1);
+  if (/[bdfgklmnprstz]/.test(lastChar)) {
+    forms.add(escRegex(cleanWord) + escRegex(lastChar) + '(?:ed|ing|er|est)');
+  }
+
+  const regex = new RegExp('\\b(' + Array.from(forms).join('|') + ')\\b', 'gi');
+  return escapedText.replace(regex, '<span class="word-hl">$1</span>');
 }
 
 // ── PROGRESS — combined across both books ──
@@ -410,6 +487,12 @@ function showToast(msg) {
 
 // ── KEYBOARD SHORTCUTS ──
 document.addEventListener('keydown', (e) => {
+  // If cloud auth modal is active, handle Esc and ignore shortcuts
+  if (EL.authModal && !EL.authModal.classList.contains('hidden')) {
+    if (e.key === 'Escape') closeAuthModal();
+    return;
+  }
+
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
   switch (e.key) {
     case 'ArrowLeft':
@@ -443,6 +526,335 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// ── AUTH & SUPABASE CLOUD SYNC ──
+let _sbClient = null;
+let _syncDebounce = null;
+
+const AUTH_STATE = {
+  user: null,
+  tab: 'signin',
+  syncStatus: 'synced', // 'synced' | 'syncing' | 'error'
+};
+
+function getSupabaseConfig() {
+  const url = (localStorage.getItem('wordsmart_sb_url') || window.SUPABASE_CONFIG?.url || '').trim();
+  const anonKey = (localStorage.getItem('wordsmart_sb_key') || window.SUPABASE_CONFIG?.anonKey || '').trim();
+  return { url, anonKey };
+}
+
+function getSupabase() {
+  if (_sbClient) return _sbClient;
+  const { url, anonKey } = getSupabaseConfig();
+  if (!url || !anonKey || typeof window.supabase === 'undefined') {
+    return null;
+  }
+  try {
+    _sbClient = window.supabase.createClient(url, anonKey);
+    return _sbClient;
+  } catch (e) {
+    console.warn('Failed to initialize Supabase client:', e);
+    return null;
+  }
+}
+
+async function initAuth() {
+  const client = getSupabase();
+  if (!client) {
+    updateAuthUI(null);
+    return;
+  }
+
+  try {
+    const { data: { session } } = await client.auth.getSession();
+    if (session?.user) {
+      AUTH_STATE.user = session.user;
+      updateAuthUI(session.user);
+      await syncFromCloud(session.user.id);
+    } else {
+      AUTH_STATE.user = null;
+      updateAuthUI(null);
+    }
+
+    client.auth.onAuthStateChange(async (event, session) => {
+      const user = session?.user || null;
+      AUTH_STATE.user = user;
+      updateAuthUI(user);
+      if (event === 'SIGNED_IN' && user) {
+        await syncFromCloud(user.id);
+      }
+    });
+  } catch (err) {
+    console.warn('Supabase auth init error:', err);
+    updateAuthUI(null);
+  }
+}
+
+function setSyncStatus(status, message) {
+  AUTH_STATE.syncStatus = status;
+  if (EL.syncDot) {
+    EL.syncDot.className = `sync-dot ${status}`;
+  }
+  if (EL.cloudSyncStatus) {
+    const dotClass = 'sync-indicator-dot ' + (status === 'syncing' ? 'syncing' : status === 'error' ? 'error' : 'synced');
+    const text = message || (status === 'syncing' ? 'Syncing...' : status === 'error' ? 'Sync error (offline / verify table)' : 'Progress is synced across devices');
+    EL.cloudSyncStatus.innerHTML = `<span class="${dotClass}"></span> ${esc(text)}`;
+  }
+}
+
+function scheduleCloudSync(immediate = false) {
+  const client = getSupabase();
+  if (!client || !AUTH_STATE.user) return;
+
+  setSyncStatus('syncing');
+  clearTimeout(_syncDebounce);
+
+  const doSync = async () => {
+    try {
+      const payload = {
+        user_id: AUTH_STATE.user.id,
+        covered_ws1: COVERED.ws1,
+        covered_ws2: COVERED.ws2,
+        current_book: STATE.book,
+        index_ws1: BOOK_INDEX.ws1,
+        index_ws2: BOOK_INDEX.ws2,
+        theme: document.documentElement.getAttribute('data-theme') || 'dark',
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await client.from('user_progress').upsert(payload, { onConflict: 'user_id' });
+      if (error) throw error;
+      setSyncStatus('synced');
+    } catch (err) {
+      console.warn('Cloud sync error:', err);
+      setSyncStatus('error', err.message || 'Sync failed');
+    }
+  };
+
+  if (immediate) {
+    doSync();
+  } else {
+    _syncDebounce = setTimeout(doSync, 700);
+  }
+}
+
+async function syncFromCloud(userId) {
+  const client = getSupabase();
+  if (!client || !userId) return;
+
+  setSyncStatus('syncing');
+  try {
+    const { data, error } = await client
+      .from('user_progress')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (data) {
+      // Merge covered words with remote
+      COVERED.ws1 = { ...COVERED.ws1, ...(data.covered_ws1 || {}) };
+      COVERED.ws2 = { ...COVERED.ws2, ...(data.covered_ws2 || {}) };
+
+      // Restore position & book
+      if (data.current_book && (data.current_book === 'ws1' || data.current_book === 'ws2')) {
+        STATE.book = data.current_book;
+      }
+      if (data.index_ws1 != null) {
+        BOOK_INDEX.ws1 = clamp(Number(data.index_ws1) || 0, 0, WS1_LEN() - 1);
+      }
+      if (data.index_ws2 != null) {
+        BOOK_INDEX.ws2 = clamp(Number(data.index_ws2) || 0, 0, WS2_LEN() - 1);
+      }
+      STATE.index = clamp(BOOK_INDEX[STATE.book], 0, VOCAB_DATA[STATE.book].length - 1);
+
+      if (data.theme) {
+        document.documentElement.setAttribute('data-theme', data.theme);
+        syncThemeIcon();
+      }
+
+      // Persist merged state to local storage
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          covered: COVERED,
+          bookIndex: { ws1: BOOK_INDEX.ws1, ws2: BOOK_INDEX.ws2 },
+          book: STATE.book,
+          theme: document.documentElement.getAttribute('data-theme'),
+        }));
+      } catch (_) {}
+
+      syncTabs();
+      renderCard();
+      if (STATE.view === 'list') renderListView();
+      updateProgress();
+      setSyncStatus('synced', 'Synced from cloud just now');
+      showToast('Loaded progress from your cloud account');
+    } else {
+      // First time user with this account -> push initial progress to cloud
+      scheduleCloudSync(true);
+    }
+  } catch (err) {
+    console.warn('Error fetching cloud progress:', err);
+    setSyncStatus('error', 'Cloud sync failed: check table in Supabase');
+  }
+}
+
+function updateAuthUI(user) {
+  if (user) {
+    EL.authBtnLabel.textContent = 'Account';
+    EL.syncDot.className = 'sync-dot synced';
+    EL.authUserView.classList.remove('hidden');
+    EL.authFormView.classList.add('hidden');
+    EL.userEmailDisplay.textContent = user.email || 'User';
+  } else {
+    EL.authBtnLabel.textContent = 'Sign In';
+    EL.syncDot.className = 'sync-dot';
+    EL.authUserView.classList.add('hidden');
+    EL.authFormView.classList.remove('hidden');
+  }
+}
+
+function openAuthModal() {
+  const { url, anonKey } = getSupabaseConfig();
+  if (EL.cfgSbUrl) EL.cfgSbUrl.value = url;
+  if (EL.cfgSbKey) EL.cfgSbKey.value = anonKey;
+
+  if (!url || !anonKey) {
+    setAuthTab('config');
+  } else {
+    setAuthTab('signin');
+  }
+  clearAuthAlert();
+  EL.authModal.classList.remove('hidden');
+}
+
+function closeAuthModal() {
+  EL.authModal.classList.add('hidden');
+  clearAuthAlert();
+}
+
+function setAuthTab(tab) {
+  AUTH_STATE.tab = tab;
+  EL.tabSignin.classList.toggle('active', tab === 'signin');
+  EL.tabSignup.classList.toggle('active', tab === 'signup');
+  EL.tabConfig.classList.toggle('active', tab === 'config');
+
+  if (tab === 'config') {
+    EL.authForm.classList.add('hidden');
+    EL.configPanel.classList.remove('hidden');
+  } else {
+    EL.authForm.classList.remove('hidden');
+    EL.configPanel.classList.add('hidden');
+    EL.authSubmitBtn.textContent = tab === 'signin' ? 'Sign In' : 'Create Account';
+    EL.authFootnote.textContent = tab === 'signin'
+      ? 'Sign in to access your saved vocabulary progress on this device.'
+      : 'Create a free account to sync your study progress across all devices.';
+  }
+  clearAuthAlert();
+}
+
+function showAuthAlert(msg, isError = true) {
+  EL.authAlert.className = `auth-alert ${isError ? 'error' : 'success'}`;
+  EL.authAlert.textContent = msg;
+  EL.authAlert.classList.remove('hidden');
+}
+
+function clearAuthAlert() {
+  EL.authAlert.classList.add('hidden');
+  EL.authAlert.textContent = '';
+}
+
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+  clearAuthAlert();
+
+  const client = getSupabase();
+  if (!client) {
+    showAuthAlert('Supabase is not configured yet. Please enter your credentials in the "Supabase Config" tab.');
+    setAuthTab('config');
+    return;
+  }
+
+  const email = EL.authEmail.value.trim();
+  const password = EL.authPassword.value;
+
+  if (!email || !password) {
+    showAuthAlert('Please fill in both email and password.');
+    return;
+  }
+
+  EL.authSubmitBtn.disabled = true;
+  const originalText = EL.authSubmitBtn.textContent;
+  EL.authSubmitBtn.textContent = 'Please wait...';
+
+  try {
+    if (AUTH_STATE.tab === 'signin') {
+      const { data, error } = await client.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      showToast('Signed in successfully');
+      closeAuthModal();
+    } else {
+      const { data, error } = await client.auth.signUp({ email, password });
+      if (error) throw error;
+      if (data.session) {
+        showToast('Account created & signed in!');
+        closeAuthModal();
+      } else {
+        showAuthAlert('Account created! Please check your email to confirm registration, or sign in if confirmation is disabled.', false);
+      }
+    }
+  } catch (err) {
+    showAuthAlert(err.message || 'Authentication error.');
+  } finally {
+    EL.authSubmitBtn.disabled = false;
+    EL.authSubmitBtn.textContent = originalText;
+  }
+}
+
+async function signOutUser() {
+  const client = getSupabase();
+  if (client) {
+    await client.auth.signOut();
+  }
+  AUTH_STATE.user = null;
+  updateAuthUI(null);
+  closeAuthModal();
+  showToast('Signed out');
+}
+
+async function manualSync() {
+  if (!AUTH_STATE.user) return;
+  const btn = $('manual-sync-btn');
+  if (btn) btn.disabled = true;
+  await syncFromCloud(AUTH_STATE.user.id);
+  await scheduleCloudSync(true);
+  if (btn) btn.disabled = false;
+  showToast('Cloud sync complete!');
+}
+
+function saveSupabaseConfig() {
+  const url = EL.cfgSbUrl.value.trim();
+  const key = EL.cfgSbKey.value.trim();
+
+  if (!url || !key) {
+    showAuthAlert('Both Supabase URL and Anon Key are required.');
+    return;
+  }
+
+  localStorage.setItem('wordsmart_sb_url', url);
+  localStorage.setItem('wordsmart_sb_key', key);
+  _sbClient = null; // Recreate client
+
+  const client = getSupabase();
+  if (client) {
+    initAuth();
+    showAuthAlert('Supabase credentials saved successfully!', false);
+    setTimeout(() => setAuthTab('signin'), 1000);
+  } else {
+    showAuthAlert('Failed to initialize Supabase with those credentials. Please check the URL format.');
+  }
+}
+
 // ── SYNC THEME ICON ON LOAD ──
 function syncThemeIcon() {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -467,6 +879,7 @@ function init() {
   syncTabs();
   syncThemeIcon();
   renderCard();
+  initAuth();
 }
 
 init();
