@@ -1,0 +1,8 @@
+# Personal credentials
+supabase-config.js
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
