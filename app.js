@@ -124,6 +124,8 @@ const EL = {
   cloudSyncStatus:  $('cloud-sync-status'),
   authAlert:        $('auth-alert'),
   googleSigninBtn:  $('google-signin-btn'),
+  mobPrevBtn:       $('mob-prev-btn'),
+  mobNextBtn:       $('mob-next-btn'),
 };
 
 // ── RENDER CARD ──
@@ -158,8 +160,12 @@ function renderCard() {
   // Nav button disabled states
   // Prev disabled only at very first word (WS1, index 0)
   // Next disabled only at very last word (WS2, last index)
-  EL.prevBtn.disabled = (STATE.book === 'ws1' && STATE.index === 0);
-  EL.nextBtn.disabled = (STATE.book === 'ws2' && STATE.index === WS2_LEN() - 1);
+  const isFirst = (STATE.book === 'ws1' && STATE.index === 0);
+  const isLast  = (STATE.book === 'ws2' && STATE.index === WS2_LEN() - 1);
+  EL.prevBtn.disabled = isFirst;
+  EL.nextBtn.disabled = isLast;
+  if (EL.mobPrevBtn) EL.mobPrevBtn.disabled = isFirst;
+  if (EL.mobNextBtn) EL.mobNextBtn.disabled = isLast;
 
   // Covered button state
   const covered = !!COVERED[STATE.book][word.id];
@@ -824,6 +830,45 @@ async function manualSync() {
   showToast('Cloud sync complete!');
 }
 
+// ── TOUCH / SWIPE GESTURES (Mobile) ──
+function initTouchGestures() {
+  const scene = $('card-scene');
+  if (!scene) return;
+
+  let startX = 0;
+  let startY = 0;
+  let startTime = 0;
+
+  scene.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startTime = Date.now();
+  }, { passive: true });
+
+  scene.addEventListener('touchend', (e) => {
+    if (e.changedTouches.length !== 1) return;
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const diffX = endX - startX;
+    const diffY = endY - startY;
+    const elapsed = Date.now() - startTime;
+
+    // Fast horizontal swipe: > 45px horizontal, less than 65px vertical drift, < 550ms
+    if (Math.abs(diffX) > 45 && Math.abs(diffY) < 65 && elapsed < 550) {
+      if (diffX < 0) {
+        // Swiped Left -> Next Card
+        if (navigator.vibrate) try { navigator.vibrate(12); } catch (_) {}
+        navigate(1);
+      } else {
+        // Swiped Right -> Previous Card
+        if (navigator.vibrate) try { navigator.vibrate(12); } catch (_) {}
+        navigate(-1);
+      }
+    }
+  }, { passive: true });
+}
+
 // ── SYNC THEME ICON ON LOAD ──
 function syncThemeIcon() {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -848,6 +893,7 @@ function init() {
   syncTabs();
   syncThemeIcon();
   renderCard();
+  initTouchGestures();
   initAuth();
 }
 

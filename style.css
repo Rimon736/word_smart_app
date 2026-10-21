@@ -127,6 +127,7 @@ ul { list-style: none; }
   transition: all 0.15s var(--ease);
   white-space: nowrap;
 }
+.tab-text-short { display: none; }
 .tab-btn:hover { color: var(--text-1); background: var(--bg-hover); }
 .tab-btn.active {
   background: var(--accent-subtle);
@@ -436,6 +437,8 @@ ul { list-style: none; }
   width: 100%;
   max-width: 640px;
 }
+.mobile-hint { display: none; }
+.mobile-nav-row { display: none; }
 
 /* ── 8. LIST VIEW ── */
 .list-section {
@@ -837,17 +840,261 @@ ul { list-style: none; }
   justify-content: center;
 }
 
-/* ── 14. RESPONSIVE ── */
+/* ── 14. RESPONSIVE (MOBILE & TABLET) ── */
 @media (max-width: 640px) {
-  .app-header { padding: 0 14px; gap: 10px; }
+  /* Header */
+  .app-header {
+    height: 52px;
+    padding: 0 12px;
+    gap: 8px;
+    justify-content: space-between;
+  }
   .logo-text { display: none; }
-  .tab-btn { padding: 5px 10px; font-size: 13px; }
-  .side-nav-btn { width: 44px; }
-  .card-col { padding: 20px 16px; gap: 16px; }
-  .card-scene { height: 280px; }
-  .card-front { padding: 24px 20px; }
-  .card-back { padding: 20px; }
-  .card-actions { flex-wrap: wrap; }
-  .list-section { padding: 20px 16px; }
+  .logo-mark {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Segmented Book Switcher */
+  .book-tabs {
+    flex: 0 1 auto;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2px;
+    gap: 2px;
+  }
+  .tab-btn {
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 16px;
+    border: none;
+  }
+  .tab-btn.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  }
+  .tab-text-full { display: none; }
+  .tab-text-short { display: inline; }
+
+  /* Header action buttons */
+  .header-actions {
+    gap: 5px;
+  }
+  .auth-btn {
+    height: 32px;
+    padding: 0 9px;
+    gap: 5px;
+    font-size: 12px;
+  }
   #auth-btn-label { display: none; }
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  /* Progress Bar */
+  .progress-meta {
+    padding: 0 14px 4px;
+    font-size: 11px;
+  }
+
+  /* Flashcard Container & Hide Side-Bars */
+  .side-nav-btn {
+    display: none !important;
+  }
+  .card-row {
+    flex-direction: column;
+    padding: 0;
+  }
+  .card-col {
+    padding: 12px 14px 20px;
+    gap: 12px;
+    width: 100%;
+  }
+
+  /* Card Counter Row */
+  .counter-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2px;
+  }
+
+  /* The Flashcard */
+  .card-scene {
+    height: 340px;
+    min-height: 320px;
+    max-height: 52vh;
+    border-radius: 16px;
+  }
+  .card-face {
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  }
+  .card-front {
+    padding: 24px 16px;
+    gap: 14px;
+  }
+  .card-label {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 12px;
+  }
+  .card-word {
+    font-size: clamp(1.9rem, 8vw, 2.7rem);
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+  }
+  .card-hint {
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.8;
+  }
+
+  .card-back {
+    padding: 18px 18px 22px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .back-row {
+    padding: 8px 0;
+    gap: 3px;
+  }
+  .back-tag {
+    font-size: 9.5px;
+  }
+  .back-definition {
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .back-bangla {
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--text-1);
+    font-weight: 500;
+  }
+  .back-phrases li {
+    font-size: 12.5px;
+    line-height: 1.45;
+  }
+
+  /* Mobile Thumb Navigation */
+  .mobile-nav-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 10px;
+    margin-top: 2px;
+  }
+  .mob-nav-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    transition: transform 0.1s var(--ease), background 0.1s var(--ease);
+    flex-shrink: 0;
+  }
+  .mob-nav-btn:active {
+    transform: scale(0.92);
+    background: var(--bg-hover);
+  }
+  .mob-nav-btn:disabled {
+    opacity: 0.22;
+    pointer-events: none;
+  }
+  .mob-flip-btn {
+    flex: 1;
+    height: 48px;
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-1);
+    font-size: 13.5px;
+    font-weight: 600;
+    font-family: var(--font);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: transform 0.1s var(--ease), background 0.1s var(--ease);
+  }
+  .mob-flip-btn:active {
+    transform: scale(0.97);
+    background: var(--bg-hover);
+  }
+
+  /* Action Buttons */
+  .card-actions {
+    width: 100%;
+    gap: 8px;
+  }
+  .actions-left {
+    display: flex;
+    gap: 6px;
+  }
+  .actions-left .btn {
+    height: 42px;
+    padding: 0 12px;
+    font-size: 12.5px;
+  }
+  #covered-btn {
+    flex: 1;
+    height: 42px;
+    font-size: 13px;
+    font-weight: 600;
+    justify-content: center;
+  }
+
+  /* Shortcuts Hint */
+  .desktop-hint { display: none; }
+  .mobile-hint { display: inline; font-size: 11px; opacity: 0.75; }
+
+  /* Covered Words Master List */
+  .list-section {
+    padding: 16px 14px 40px;
+    gap: 14px;
+  }
+  .covered-grid {
+    grid-template-columns: 1fr;
+    border-radius: var(--radius-md);
+  }
+  .covered-card {
+    padding: 12px 14px;
+  }
+  .covered-card-word {
+    font-size: 15px;
+  }
+  .covered-card-goto {
+    opacity: 1;
+    margin-top: 6px;
+  }
+
+  /* Auth Modal */
+  .modal-backdrop {
+    padding: 12px;
+    align-items: flex-end;
+  }
+  .modal-card {
+    max-width: 100%;
+    border-radius: 20px 20px 14px 14px;
+    animation: modalSlideUp 0.22s var(--ease);
+  }
+  @keyframes modalSlideUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 }

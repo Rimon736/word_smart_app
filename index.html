@@ -21,10 +21,12 @@
 
     <nav class="book-tabs" role="tablist" aria-label="Book selection">
       <button id="tab-ws1" class="tab-btn active" role="tab" aria-selected="true" onclick="switchBook('ws1')">
-        Word Smart 1
+        <span class="tab-text-full">Word Smart 1</span>
+        <span class="tab-text-short">WS 1</span>
       </button>
       <button id="tab-ws2" class="tab-btn" role="tab" aria-selected="false" onclick="switchBook('ws2')">
-        Word Smart 2
+        <span class="tab-text-full">Word Smart 2</span>
+        <span class="tab-text-short">WS 2</span>
       </button>
     </nav>
 
@@ -139,21 +141,43 @@
             </div>
           </div>
 
+          <!-- Mobile Thumb-Zone Navigation (visible on mobile) -->
+          <div class="mobile-nav-row">
+            <button id="mob-prev-btn" class="mob-nav-btn" onclick="navigate(-1)" aria-label="Previous word">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+            </button>
+
+            <button id="mob-flip-btn" class="mob-flip-btn" onclick="flipCard()" aria-label="Flip card">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+              </svg>
+              <span>Tap to Flip</span>
+            </button>
+
+            <button id="mob-next-btn" class="mob-nav-btn" onclick="navigate(1)" aria-label="Next word">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </button>
+          </div>
+
           <!-- Actions: Shuffle + Reset on left, Mark as Covered on right -->
           <div class="card-actions">
             <div class="actions-left">
-              <button class="btn btn-secondary" onclick="shuffleCards()">
+              <button class="btn btn-secondary" onclick="shuffleCards()" title="Shuffle words in current book">
                 <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
                   <polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/>
                 </svg>
-                Shuffle
+                <span>Shuffle</span>
               </button>
-              <button class="btn btn-ghost" onclick="resetProgress()">
+              <button class="btn btn-ghost" onclick="resetProgress()" title="Reset study progress">
                 <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
                 </svg>
-                Reset
+                <span>Reset</span>
               </button>
             </div>
 
@@ -166,7 +190,8 @@
           </div>
 
           <p class="shortcuts-hint">
-            Arrow keys to navigate &nbsp;&middot;&nbsp; Space to flip &nbsp;&middot;&nbsp; C to mark covered
+            <span class="desktop-hint">Arrow keys to navigate &nbsp;&middot;&nbsp; Space to flip &nbsp;&middot;&nbsp; C to mark covered</span>
+            <span class="mobile-hint">Swipe left / right &nbsp;&middot;&nbsp; Tap card to flip</span>
           </p>
 
         </div><!-- /.card-col -->
