@@ -529,24 +529,42 @@ const AUTH_STATE = {
 };
 
 function getSupabaseConfig() {
+  if (window.SUPABASE_CONFIG?.url && window.SUPABASE_CONFIG?.anonKey) {
+    return {
+      url: window.SUPABASE_CONFIG.url.trim(),
+      anonKey: window.SUPABASE_CONFIG.anonKey.trim(),
+    };
+  }
   const cfg = window.SUPABASE_CONFIG || {};
-  const url = (localStorage.getItem('wordsmart_sb_url') || cfg.url || '').trim();
-  const anonKey = (localStorage.getItem('wordsmart_sb_key') || cfg.anonKey || '').trim();
+  const url = (cfg.url || localStorage.getItem('wordsmart_sb_url') || '').trim();
+  const anonKey = (cfg.anonKey || localStorage.getItem('wordsmart_sb_key') || '').trim();
   return { url, anonKey };
 }
 
 function getSupabase() {
-  if (_sbClient) return _sbClient;
-  const { url, anonKey } = getSupabaseConfig();
-  if (!url || !anonKey || typeof window.supabase === 'undefined') {
-    return null;
+  if (_sbClient) return { client: _sbClient, error: null };
+
+  if (typeof window.supabase === 'undefined') {
+    return {
+      client: null,
+      error: 'The Supabase library could not be loaded from CDN. Please check your internet connection or disable adblockers for this page.'
+    };
   }
+
+  const { url, anonKey } = getSupabaseConfig();
+  if (!url || !anonKey) {
+    return {
+      client: null,
+      error: 'Supabase URL or Anon Key is missing. Please check your credentials in supabase-config.js.'
+    };
+  }
+
   try {
     _sbClient = window.supabase.createClient(url, anonKey);
-    return _sbClient;
+    return { client: _sbClient, error: null };
   } catch (e) {
-    console.warn('Failed to initialize Supabase client:', e);
-    return null;
+    console.error('Failed to initialize Supabase client:', e);
+    return { client: null, error: 'Failed to initialize Supabase: ' + e.message };
   }
 }
 
@@ -558,7 +576,7 @@ async function initAuth() {
     } catch (_) {}
   }
 
-  const client = getSupabase();
+  const { client } = getSupabase();
   if (!client) {
     updateAuthUI(null);
     return;
@@ -602,7 +620,7 @@ function setSyncStatus(status, message) {
 }
 
 function scheduleCloudSync(immediate = false) {
-  const client = getSupabase();
+  const { client } = getSupabase();
   if (!client || !AUTH_STATE.user) return;
 
   setSyncStatus('syncing');
@@ -638,7 +656,7 @@ function scheduleCloudSync(immediate = false) {
 }
 
 async function syncFromCloud(userId) {
-  const client = getSupabase();
+  const { client } = getSupabase();
   if (!client || !userId) return;
 
   setSyncStatus('syncing');
@@ -753,16 +771,22 @@ function clearAuthAlert() {
 
 async function signInWithGoogle() {
   clearAuthAlert();
-  const client = getSupabase();
+
+  if (window.location.protocol === 'file:') {
+    showAuthAlert('Google OAuth cannot run from a local file:// URL. Please open the project using a local web server (e.g. VS Code Live Server or "npx serve") or deploy to GitHub Pages / Vercel.');
+    return;
+  }
+
+  const { client, error } = getSupabase();
   if (!client) {
-    showAuthAlert('Supabase is not configured yet. Please check supabase-config.js.');
+    showAuthAlert(error || 'Supabase is not configured yet. Please check supabase-config.js.');
     return;
   }
 
   if (EL.googleSigninBtn) EL.googleSigninBtn.disabled = true;
 
   try {
-    const { error } = await client.auth.signInWithOAuth({
+    const { error: oauthError } = await client.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: window.location.origin + window.location.pathname,
@@ -772,7 +796,7 @@ async function signInWithGoogle() {
         }
       }
     });
-    if (error) throw error;
+    if (oauthError) throw oauthError;
   } catch (err) {
     showAuthAlert(err.message || 'Google sign-in error.');
     if (EL.googleSigninBtn) EL.googleSigninBtn.disabled = false;
@@ -780,7 +804,7 @@ async function signInWithGoogle() {
 }
 
 async function signOutUser() {
-  const client = getSupabase();
+  const { client } = getSupabase();
   if (client) {
     await client.auth.signOut();
   }
