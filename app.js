@@ -117,20 +117,13 @@ const EL = {
   authModal:        $('auth-modal'),
   authUserView:     $('auth-user-view'),
   authFormView:     $('auth-form-view'),
+  userNameDisplay:  $('user-name-display'),
   userEmailDisplay: $('user-email-display'),
+  userAvatarImg:    $('user-avatar-img'),
+  defaultAvatarSvg: $('default-avatar-svg'),
   cloudSyncStatus:  $('cloud-sync-status'),
   authAlert:        $('auth-alert'),
-  authForm:         $('auth-form'),
-  authEmail:        $('auth-email'),
-  authPassword:     $('auth-password'),
-  authSubmitBtn:    $('auth-submit-btn'),
-  authFootnote:     $('auth-footnote'),
-  configPanel:      $('config-panel'),
-  cfgSbUrl:         $('cfg-sb-url'),
-  cfgSbKey:         $('cfg-sb-key'),
-  tabSignin:        $('tab-signin'),
-  tabSignup:        $('tab-signup'),
-  tabConfig:        $('tab-config'),
+  googleSigninBtn:  $('google-signin-btn'),
 };
 
 // ── RENDER CARD ──
@@ -532,13 +525,13 @@ let _syncDebounce = null;
 
 const AUTH_STATE = {
   user: null,
-  tab: 'signin',
   syncStatus: 'synced', // 'synced' | 'syncing' | 'error'
 };
 
 function getSupabaseConfig() {
-  const url = (localStorage.getItem('wordsmart_sb_url') || window.SUPABASE_CONFIG?.url || '').trim();
-  const anonKey = (localStorage.getItem('wordsmart_sb_key') || window.SUPABASE_CONFIG?.anonKey || '').trim();
+  const cfg = window.SUPABASE_CONFIG || {};
+  const url = (localStorage.getItem('wordsmart_sb_url') || cfg.url || '').trim();
+  const anonKey = (localStorage.getItem('wordsmart_sb_key') || cfg.anonKey || '').trim();
   return { url, anonKey };
 }
 
@@ -558,6 +551,13 @@ function getSupabase() {
 }
 
 async function initAuth() {
+  // Clean URL hash if returning from OAuth redirect
+  if (window.location.hash && window.location.hash.includes('access_token')) {
+    try {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    } catch (_) {}
+  }
+
   const client = getSupabase();
   if (!client) {
     updateAuthUI(null);
@@ -579,7 +579,7 @@ async function initAuth() {
       const user = session?.user || null;
       AUTH_STATE.user = user;
       updateAuthUI(user);
-      if (event === 'SIGNED_IN' && user) {
+      if (user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')) {
         await syncFromCloud(user.id);
       }
     });
@@ -596,7 +596,7 @@ function setSyncStatus(status, message) {
   }
   if (EL.cloudSyncStatus) {
     const dotClass = 'sync-indicator-dot ' + (status === 'syncing' ? 'syncing' : status === 'error' ? 'error' : 'synced');
-    const text = message || (status === 'syncing' ? 'Syncing...' : status === 'error' ? 'Sync error (offline / verify table)' : 'Progress is synced across devices');
+    const text = message || (status === 'syncing' ? 'Syncing...' : status === 'error' ? 'Sync error (offline / verify table)' : 'Synced with Google across devices');
     EL.cloudSyncStatus.innerHTML = `<span class="${dotClass}"></span> ${esc(text)}`;
   }
 }
@@ -687,8 +687,8 @@ async function syncFromCloud(userId) {
       renderCard();
       if (STATE.view === 'list') renderListView();
       updateProgress();
-      setSyncStatus('synced', 'Synced from cloud just now');
-      showToast('Loaded progress from your cloud account');
+      setSyncStatus('synced', 'Synced from Google account just now');
+      showToast('Progress synced with Google');
     } else {
       // First time user with this account -> push initial progress to cloud
       scheduleCloudSync(true);
@@ -701,55 +701,42 @@ async function syncFromCloud(userId) {
 
 function updateAuthUI(user) {
   if (user) {
+    const meta = user.user_metadata || {};
+    const name = meta.full_name || meta.name || user.email?.split('@')[0] || 'Google User';
+    const avatar = meta.avatar_url || meta.picture || null;
+
+    if (EL.userNameDisplay) EL.userNameDisplay.textContent = name;
+    if (EL.userEmailDisplay) EL.userEmailDisplay.textContent = user.email || '';
+    if (avatar && EL.userAvatarImg) {
+      EL.userAvatarImg.src = avatar;
+      EL.userAvatarImg.classList.remove('hidden');
+      if (EL.defaultAvatarSvg) EL.defaultAvatarSvg.classList.add('hidden');
+    } else {
+      if (EL.userAvatarImg) EL.userAvatarImg.classList.add('hidden');
+      if (EL.defaultAvatarSvg) EL.defaultAvatarSvg.classList.remove('hidden');
+    }
+
     EL.authBtnLabel.textContent = 'Account';
     EL.syncDot.className = 'sync-dot synced';
     EL.authUserView.classList.remove('hidden');
     EL.authFormView.classList.add('hidden');
-    EL.userEmailDisplay.textContent = user.email || 'User';
   } else {
     EL.authBtnLabel.textContent = 'Sign In';
     EL.syncDot.className = 'sync-dot';
     EL.authUserView.classList.add('hidden');
     EL.authFormView.classList.remove('hidden');
+    if (EL.userAvatarImg) EL.userAvatarImg.classList.add('hidden');
+    if (EL.defaultAvatarSvg) EL.defaultAvatarSvg.classList.remove('hidden');
   }
 }
 
 function openAuthModal() {
-  const { url, anonKey } = getSupabaseConfig();
-  if (EL.cfgSbUrl) EL.cfgSbUrl.value = url;
-  if (EL.cfgSbKey) EL.cfgSbKey.value = anonKey;
-
-  if (!url || !anonKey) {
-    setAuthTab('config');
-  } else {
-    setAuthTab('signin');
-  }
   clearAuthAlert();
   EL.authModal.classList.remove('hidden');
 }
 
 function closeAuthModal() {
   EL.authModal.classList.add('hidden');
-  clearAuthAlert();
-}
-
-function setAuthTab(tab) {
-  AUTH_STATE.tab = tab;
-  EL.tabSignin.classList.toggle('active', tab === 'signin');
-  EL.tabSignup.classList.toggle('active', tab === 'signup');
-  EL.tabConfig.classList.toggle('active', tab === 'config');
-
-  if (tab === 'config') {
-    EL.authForm.classList.add('hidden');
-    EL.configPanel.classList.remove('hidden');
-  } else {
-    EL.authForm.classList.remove('hidden');
-    EL.configPanel.classList.add('hidden');
-    EL.authSubmitBtn.textContent = tab === 'signin' ? 'Sign In' : 'Create Account';
-    EL.authFootnote.textContent = tab === 'signin'
-      ? 'Sign in to access your saved vocabulary progress on this device.'
-      : 'Create a free account to sync your study progress across all devices.';
-  }
   clearAuthAlert();
 }
 
@@ -764,50 +751,31 @@ function clearAuthAlert() {
   EL.authAlert.textContent = '';
 }
 
-async function handleAuthSubmit(e) {
-  e.preventDefault();
+async function signInWithGoogle() {
   clearAuthAlert();
-
   const client = getSupabase();
   if (!client) {
-    showAuthAlert('Supabase is not configured yet. Please enter your credentials in the "Supabase Config" tab.');
-    setAuthTab('config');
+    showAuthAlert('Supabase is not configured yet. Please check supabase-config.js.');
     return;
   }
 
-  const email = EL.authEmail.value.trim();
-  const password = EL.authPassword.value;
-
-  if (!email || !password) {
-    showAuthAlert('Please fill in both email and password.');
-    return;
-  }
-
-  EL.authSubmitBtn.disabled = true;
-  const originalText = EL.authSubmitBtn.textContent;
-  EL.authSubmitBtn.textContent = 'Please wait...';
+  if (EL.googleSigninBtn) EL.googleSigninBtn.disabled = true;
 
   try {
-    if (AUTH_STATE.tab === 'signin') {
-      const { data, error } = await client.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      showToast('Signed in successfully');
-      closeAuthModal();
-    } else {
-      const { data, error } = await client.auth.signUp({ email, password });
-      if (error) throw error;
-      if (data.session) {
-        showToast('Account created & signed in!');
-        closeAuthModal();
-      } else {
-        showAuthAlert('Account created! Please check your email to confirm registration, or sign in if confirmation is disabled.', false);
+    const { error } = await client.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + window.location.pathname,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'select_account',
+        }
       }
-    }
+    });
+    if (error) throw error;
   } catch (err) {
-    showAuthAlert(err.message || 'Authentication error.');
-  } finally {
-    EL.authSubmitBtn.disabled = false;
-    EL.authSubmitBtn.textContent = originalText;
+    showAuthAlert(err.message || 'Google sign-in error.');
+    if (EL.googleSigninBtn) EL.googleSigninBtn.disabled = false;
   }
 }
 
@@ -830,29 +798,6 @@ async function manualSync() {
   await scheduleCloudSync(true);
   if (btn) btn.disabled = false;
   showToast('Cloud sync complete!');
-}
-
-function saveSupabaseConfig() {
-  const url = EL.cfgSbUrl.value.trim();
-  const key = EL.cfgSbKey.value.trim();
-
-  if (!url || !key) {
-    showAuthAlert('Both Supabase URL and Anon Key are required.');
-    return;
-  }
-
-  localStorage.setItem('wordsmart_sb_url', url);
-  localStorage.setItem('wordsmart_sb_key', key);
-  _sbClient = null; // Recreate client
-
-  const client = getSupabase();
-  if (client) {
-    initAuth();
-    showAuthAlert('Supabase credentials saved successfully!', false);
-    setTimeout(() => setAuthTab('signin'), 1000);
-  } else {
-    showAuthAlert('Failed to initialize Supabase with those credentials. Please check the URL format.');
-  }
 }
 
 // ── SYNC THEME ICON ON LOAD ──

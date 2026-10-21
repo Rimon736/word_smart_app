@@ -204,23 +204,25 @@
   <div id="auth-modal" class="modal-backdrop hidden" onclick="if(event.target===this) closeAuthModal()">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-header">
-        <h3 id="modal-title" class="modal-title">Cloud Account</h3>
+        <h3 id="modal-title" class="modal-title">WordSmart Account</h3>
         <button class="modal-close-btn" onclick="closeAuthModal()" aria-label="Close modal">&times;</button>
       </div>
 
       <!-- Logged-in View -->
       <div id="auth-user-view" class="modal-body hidden">
         <div class="user-profile-badge">
-          <div class="user-avatar-circle">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <div class="user-avatar-circle" id="user-avatar-wrap">
+            <svg id="default-avatar-svg" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
               <circle cx="12" cy="7" r="4"/>
             </svg>
+            <img id="user-avatar-img" class="user-avatar-img hidden" alt="Google Profile" />
           </div>
           <div class="user-profile-info">
-            <div id="user-email-display" class="user-email">user@example.com</div>
+            <div id="user-name-display" class="user-name">Google User</div>
+            <div id="user-email-display" class="user-email">user@gmail.com</div>
             <div id="cloud-sync-status" class="sync-status-text">
-              <span class="sync-indicator-dot synced"></span> Progress is synced across devices
+              <span class="sync-indicator-dot synced"></span> Synced with Google across devices
             </div>
           </div>
         </div>
@@ -236,58 +238,28 @@
         </div>
       </div>
 
-      <!-- Logged-out / Auth Form View -->
+      <!-- Logged-out View (Gmail / Google Auth) -->
       <div id="auth-form-view" class="modal-body">
-        <div class="modal-tabs">
-          <button id="tab-signin" class="modal-tab-btn active" onclick="setAuthTab('signin')">Sign In</button>
-          <button id="tab-signup" class="modal-tab-btn" onclick="setAuthTab('signup')">Sign Up</button>
-          <button id="tab-config" class="modal-tab-btn" onclick="setAuthTab('config')">Supabase Config</button>
+        <div class="google-auth-intro">
+          <p class="google-auth-title">Sync your progress across all devices</p>
+          <p class="google-auth-sub">Sign in with your Google account to automatically save your covered words, flashcard positions, and learning stats.</p>
         </div>
 
-        <!-- Sign In & Sign Up Form -->
-        <form id="auth-form" onsubmit="handleAuthSubmit(event)">
-          <div id="auth-alert" class="auth-alert hidden"></div>
+        <div id="auth-alert" class="auth-alert hidden"></div>
 
-          <div class="form-group">
-            <label for="auth-email" class="form-label">Email Address</label>
-            <input type="email" id="auth-email" class="form-input" placeholder="you@example.com" required autocomplete="email" />
-          </div>
+        <button type="button" class="btn-google" onclick="signInWithGoogle()" id="google-signin-btn">
+          <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+            <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.616z" fill="#4285F4"/>
+            <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+            <path d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707s.102-1.167.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/>
+            <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z" fill="#EA4335"/>
+          </svg>
+          <span>Continue with Google</span>
+        </button>
 
-          <div class="form-group">
-            <label for="auth-password" class="form-label">Password</label>
-            <input type="password" id="auth-password" class="form-input" placeholder="••••••••" required autocomplete="current-password" minlength="6" />
-          </div>
-
-          <button type="submit" id="auth-submit-btn" class="btn btn-primary btn-block">
-            Sign In
-          </button>
-          <p class="auth-footnote" id="auth-footnote">
-            Progress is automatically saved and synced whenever you change cards or mark words.
-          </p>
-        </form>
-
-        <!-- Supabase Settings Sub-panel -->
-        <div id="config-panel" class="config-panel hidden">
-          <p class="config-desc">
-            Connect to your Supabase project to enable email authentication and cross-device sync.
-          </p>
-          <div class="form-group">
-            <label for="cfg-sb-url" class="form-label">Project URL</label>
-            <input type="url" id="cfg-sb-url" class="form-input" placeholder="https://your-project.supabase.co" />
-          </div>
-          <div class="form-group">
-            <label for="cfg-sb-key" class="form-label">Anon / Public Key</label>
-            <input type="password" id="cfg-sb-key" class="form-input" placeholder="eyJhbGciOi..." />
-          </div>
-          <div class="modal-btn-row">
-            <button type="button" class="btn btn-primary" onclick="saveSupabaseConfig()">Save Credentials</button>
-            <button type="button" class="btn btn-ghost" onclick="setAuthTab('signin')">Back</button>
-          </div>
-          <div class="config-guide">
-            <small>Need to set up Supabase? Run the script in <code>supabase_setup.sql</code> in your Supabase SQL editor.</small>
-          </div>
-        </div>
-
+        <p class="auth-footnote">
+          Instant 1-click sign in. No password to remember.
+        </p>
       </div>
     </div>
   </div>
