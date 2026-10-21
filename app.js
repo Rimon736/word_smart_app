@@ -34,6 +34,9 @@ const REVISION = { ws1: {}, ws2: {} };
 // Active list tab: 'covered' | 'revision'
 let ACTIVE_LIST_TAB = 'covered';
 
+// Context for returning to list from a flashcard clicked in list view
+let LAST_LIST_CONTEXT = null; // { tab: 'covered' | 'revision', wordId: string }
+
 // Display order (array of indices into VOCAB_DATA[book]).
 // Sequential by default; shuffled on user request.
 const ORDER = { ws1: [], ws2: [] };
@@ -142,6 +145,8 @@ const EL = {
   googleSigninBtn:  $('google-signin-btn'),
   mobPrevBtn:       $('mob-prev-btn'),
   mobNextBtn:       $('mob-next-btn'),
+  backToListBtn:    $('back-to-list-btn'),
+  backToListLabel:  $('back-to-list-label'),
 };
 
 // ── RENDER CARD ──
@@ -426,6 +431,7 @@ function toggleView() {
     EL.listView.classList.remove('hidden');
     EL.iconGrid.classList.add('hidden');
     EL.iconCard.classList.remove('hidden');
+    if (EL.backToListBtn) EL.backToListBtn.classList.add('hidden');
     renderListView();
   } else {
     STATE.view = 'flashcard';
@@ -483,7 +489,8 @@ function renderListView() {
     const bookLabel = book === 'ws1' ? 'WS1' : 'WS2';
     const tag = isRev ? '<span class="card-revision-pill">Revision</span>' : '';
     return `
-      <div class="covered-card"
+      <div id="covered-card-${esc(w.id)}"
+           class="covered-card"
            role="button"
            tabindex="0"
            aria-label="Go to flashcard: ${esc(w.word)}"
@@ -512,6 +519,20 @@ function goToCard(wordId) {
   const orderIdx = ORDER[targetBook].indexOf(rawIdx);
   if (orderIdx === -1) return;
 
+  // Save return context
+  LAST_LIST_CONTEXT = {
+    tab: ACTIVE_LIST_TAB,
+    wordId: wordId,
+  };
+
+  // Show "Back to ..." button with dynamic label
+  if (EL.backToListBtn) {
+    if (EL.backToListLabel) {
+      EL.backToListLabel.textContent = (ACTIVE_LIST_TAB === 'revision') ? 'Back to Revision' : 'Back to Covered';
+    }
+    EL.backToListBtn.classList.remove('hidden');
+  }
+
   // Switch to flashcard view, update icons
   STATE.view = 'flashcard';
   EL.listView.classList.add('hidden');
@@ -531,6 +552,38 @@ function goToCard(wordId) {
   BOOK_INDEX[targetBook]   = orderIdx;
   renderCard();
   showToast(`Jumped to "${currentWord().word}"`);
+}
+
+// ── RETURN TO LIST FROM CARD ──
+function returnToList() {
+  const ctx = LAST_LIST_CONTEXT;
+  STATE.view = 'list';
+  EL.flashcardView.classList.add('hidden');
+  EL.listView.classList.remove('hidden');
+  EL.iconGrid.classList.add('hidden');
+  EL.iconCard.classList.remove('hidden');
+  if (EL.backToListBtn) EL.backToListBtn.classList.add('hidden');
+
+  if (ctx && ctx.tab) {
+    ACTIVE_LIST_TAB = ctx.tab;
+  }
+  renderListView();
+
+  if (ctx && ctx.wordId) {
+    requestAnimationFrame(() => {
+      const cardEl = document.getElementById(`covered-card-${ctx.wordId}`);
+      if (cardEl) {
+        cardEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const glowClass = (ctx.tab === 'revision') ? 'card-glow-amber' : 'card-glow';
+        cardEl.classList.remove('card-glow', 'card-glow-amber');
+        void cardEl.offsetWidth; // Force reflow to restart animation
+        cardEl.classList.add(glowClass);
+        setTimeout(() => {
+          cardEl.classList.remove(glowClass);
+        }, 1500);
+      }
+    });
+  }
 }
 
 // ── THEME TOGGLE ──
@@ -562,6 +615,19 @@ document.addEventListener('keydown', (e) => {
   }
 
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+
+  // Spacebar flip (works seamlessly across all browsers & blurs active button)
+  if (e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar') {
+    if (STATE.view === 'flashcard') {
+      e.preventDefault();
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+      flipCard();
+      return;
+    }
+  }
+
   switch (e.key) {
     case 'ArrowLeft':
       if (STATE.view === 'flashcard') navigate(-1);
@@ -569,7 +635,6 @@ document.addEventListener('keydown', (e) => {
     case 'ArrowRight':
       if (STATE.view === 'flashcard') navigate(1);
       break;
-    case ' ':
     case 'Enter':
       if (STATE.view === 'flashcard') { e.preventDefault(); flipCard(); }
       break;
