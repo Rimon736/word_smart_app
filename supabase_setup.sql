@@ -9,12 +9,18 @@ create table if not exists public.user_progress (
   user_id uuid references auth.users(id) on delete cascade unique not null,
   covered_ws1 jsonb default '{}'::jsonb not null,
   covered_ws2 jsonb default '{}'::jsonb not null,
+  revision_ws1 jsonb default '{}'::jsonb not null,
+  revision_ws2 jsonb default '{}'::jsonb not null,
   current_book text default 'ws1' not null,
   index_ws1 integer default 0 not null,
   index_ws2 integer default 0 not null,
   theme text default 'dark' not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+-- If you already created the table previously, run these two lines to add the revision columns:
+alter table public.user_progress add column if not exists revision_ws1 jsonb default '{}'::jsonb not null;
+alter table public.user_progress add column if not exists revision_ws2 jsonb default '{}'::jsonb not null;
 
 -- 2. Enable Row Level Security (RLS)
 alter table public.user_progress enable row level security;

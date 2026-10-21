@@ -28,6 +28,12 @@ const BOOK_INDEX = { ws1: 0, ws2: 0 };
 // Covered words: { ws1: { id: true, ... }, ws2: { ... } }
 const COVERED = { ws1: {}, ws2: {} };
 
+// Revision words: { ws1: { id: true, ... }, ws2: { ... } }
+const REVISION = { ws1: {}, ws2: {} };
+
+// Active list tab: 'covered' | 'revision'
+let ACTIVE_LIST_TAB = 'covered';
+
 // Display order (array of indices into VOCAB_DATA[book]).
 // Sequential by default; shuffled on user request.
 const ORDER = { ws1: [], ws2: [] };
@@ -54,6 +60,7 @@ function persist() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       covered:   COVERED,
+      revision:  REVISION,
       bookIndex: { ws1: BOOK_INDEX.ws1, ws2: BOOK_INDEX.ws2 },
       book:      STATE.book,
       theme:     document.documentElement.getAttribute('data-theme'),
@@ -73,6 +80,8 @@ function hydrate() {
     const s = JSON.parse(raw);
     if (s.covered?.ws1) COVERED.ws1 = s.covered.ws1;
     if (s.covered?.ws2) COVERED.ws2 = s.covered.ws2;
+    if (s.revision?.ws1) REVISION.ws1 = s.revision.ws1;
+    if (s.revision?.ws2) REVISION.ws2 = s.revision.ws2;
     if (s.bookIndex?.ws1 != null) BOOK_INDEX.ws1 = Number(s.bookIndex.ws1) || 0;
     if (s.bookIndex?.ws2 != null) BOOK_INDEX.ws2 = Number(s.bookIndex.ws2) || 0;
     if (s.book) STATE.book = s.book;
@@ -96,9 +105,16 @@ const EL = {
   progressCount:    $('progress-count'),
   coveredBtn:       $('covered-btn'),
   coveredBtnTxt:    $('covered-btn-text'),
+  revisionBtn:      $('revision-btn'),
+  revisionBtnTxt:   $('revision-btn-text'),
   coveredList:      $('covered-list'),
   coveredEmpty:     $('covered-list-empty'),
-  listStats:        $('list-stats'),
+  listEmptyTitle:   $('list-empty-title'),
+  listEmptySub:     $('list-empty-sub'),
+  tabListCovered:   $('tab-list-covered'),
+  tabListRevision:  $('tab-list-revision'),
+  badgeCovered:     $('badge-covered-count'),
+  badgeRevision:    $('badge-revision-count'),
   flashcardView:    $('flashcard-view'),
   listView:         $('list-view'),
   tabWs1:           $('tab-ws1'),
@@ -171,6 +187,15 @@ function renderCard() {
   const covered = !!COVERED[STATE.book][word.id];
   EL.coveredBtn.classList.toggle('is-covered', covered);
   EL.coveredBtnTxt.textContent = covered ? 'Covered' : 'Mark as Covered';
+
+  // Revision button state
+  const inRev = !!REVISION[STATE.book][word.id];
+  if (EL.revisionBtn) {
+    EL.revisionBtn.classList.toggle('is-revision', inRev);
+    if (EL.revisionBtnTxt) {
+      EL.revisionBtnTxt.textContent = inRev ? 'In Revision' : 'Add to Revision';
+    }
+  }
 
   updateProgress();
   persist();
@@ -324,6 +349,22 @@ function markCovered() {
   if (STATE.view === 'list') renderListView();
 }
 
+// ── TOGGLE REVISION ──
+function toggleRevision() {
+  const word = currentWord();
+  if (!word) return;
+  const inRev = !!REVISION[STATE.book][word.id];
+  if (inRev) {
+    delete REVISION[STATE.book][word.id];
+    showToast(`"${word.word}" removed from revision`);
+  } else {
+    REVISION[STATE.book][word.id] = true;
+    showToast(`"${word.word}" added to revision list`);
+  }
+  renderCard();
+  if (STATE.view === 'list') renderListView();
+}
+
 // ── SWITCH BOOK (tab click) ──
 function switchBook(book) {
   if (STATE.book === book) return;
@@ -362,9 +403,11 @@ function shuffleCards() {
 
 // ── RESET ──
 function resetProgress() {
-  if (!confirm('Reset all covered words for both books? This cannot be undone.')) return;
+  if (!confirm('Reset covered words and revision list for both books? This cannot be undone.')) return;
   COVERED.ws1 = {};
   COVERED.ws2 = {};
+  REVISION.ws1 = {};
+  REVISION.ws2 = {};
   STATE.index = 0;
   BOOK_INDEX.ws1 = 0;
   BOOK_INDEX.ws2 = 0;
@@ -393,16 +436,42 @@ function toggleView() {
   }
 }
 
+// ── SWITCH LIST TAB ──
+function switchListTab(tab) {
+  ACTIVE_LIST_TAB = tab;
+  renderListView();
+}
+
 // ── RENDER LIST VIEW ──
 function renderListView() {
-  // Show covered words from BOTH books in the list view
-  const ws1Entries = VOCAB_DATA.ws1.filter(w => COVERED.ws1[w.id]);
-  const ws2Entries = VOCAB_DATA.ws2.filter(w => COVERED.ws2[w.id]);
+  const isRev = (ACTIVE_LIST_TAB === 'revision');
+  const source = isRev ? REVISION : COVERED;
+
+  const ws1Entries = VOCAB_DATA.ws1.filter(w => source.ws1[w.id]);
+  const ws2Entries = VOCAB_DATA.ws2.filter(w => source.ws2[w.id]);
   const entries    = [...ws1Entries, ...ws2Entries];
   const count      = entries.length;
 
-  EL.listStats.textContent = `${count} word${count !== 1 ? 's' : ''}`;
-  EL.coveredEmpty.classList.toggle('hidden', count > 0);
+  const covCount = Object.keys(COVERED.ws1).length + Object.keys(COVERED.ws2).length;
+  const revCount = Object.keys(REVISION.ws1).length + Object.keys(REVISION.ws2).length;
+
+  if (EL.badgeCovered) EL.badgeCovered.textContent = covCount;
+  if (EL.badgeRevision) EL.badgeRevision.textContent = revCount;
+
+  if (EL.tabListCovered) EL.tabListCovered.classList.toggle('active', !isRev);
+  if (EL.tabListRevision) EL.tabListRevision.classList.toggle('active', isRev);
+
+  if (EL.coveredEmpty) {
+    EL.coveredEmpty.classList.toggle('hidden', count > 0);
+    if (EL.listEmptyTitle) {
+      EL.listEmptyTitle.textContent = isRev ? 'No words in revision list yet.' : 'No covered words yet.';
+    }
+    if (EL.listEmptySub) {
+      EL.listEmptySub.textContent = isRev
+        ? 'Click "Add to Revision" on flashcards to bookmark words for focused review.'
+        : 'Mark words as covered from the flashcard view.';
+    }
+  }
 
   if (count === 0) {
     EL.coveredList.innerHTML = '';
@@ -410,9 +479,9 @@ function renderListView() {
   }
 
   EL.coveredList.innerHTML = entries.map(w => {
-    // Determine book from id prefix
-    const book      = w.id.startsWith('ws1') ? 'ws1' : 'ws2';
+    const book = w.id.startsWith('ws1') ? 'ws1' : 'ws2';
     const bookLabel = book === 'ws1' ? 'WS1' : 'WS2';
+    const tag = isRev ? '<span class="card-revision-pill">Revision</span>' : '';
     return `
       <div class="covered-card"
            role="button"
@@ -421,7 +490,7 @@ function renderListView() {
            onclick="goToCard('${esc(w.id)}')"
            onkeydown="if(event.key==='Enter')goToCard('${esc(w.id)}')">
         <span class="covered-card-book">${bookLabel}</span>
-        <div class="covered-card-word">${esc(w.word)}</div>
+        <div class="covered-card-word">${esc(w.word)} ${tag}</div>
         <div class="covered-card-def">${esc(w.definition)}</div>
         <div class="covered-card-goto">Open flashcard &rarr;</div>
       </div>`;
@@ -507,6 +576,10 @@ document.addEventListener('keydown', (e) => {
     case 'c':
     case 'C':
       if (STATE.view === 'flashcard') markCovered();
+      break;
+    case 'r':
+    case 'R':
+      if (STATE.view === 'flashcard') toggleRevision();
       break;
     case '1':
       switchBook('ws1');
@@ -638,6 +711,8 @@ function scheduleCloudSync(immediate = false) {
         user_id: AUTH_STATE.user.id,
         covered_ws1: COVERED.ws1,
         covered_ws2: COVERED.ws2,
+        revision_ws1: REVISION.ws1,
+        revision_ws2: REVISION.ws2,
         current_book: STATE.book,
         index_ws1: BOOK_INDEX.ws1,
         index_ws2: BOOK_INDEX.ws2,
@@ -645,7 +720,14 @@ function scheduleCloudSync(immediate = false) {
         updated_at: new Date().toISOString()
       };
 
-      const { error } = await client.from('user_progress').upsert(payload, { onConflict: 'user_id' });
+      let { error } = await client.from('user_progress').upsert(payload, { onConflict: 'user_id' });
+      // If table doesn't have revision columns yet, fallback without them
+      if (error && error.message && error.message.includes('revision')) {
+        delete payload.revision_ws1;
+        delete payload.revision_ws2;
+        const fallbackRes = await client.from('user_progress').upsert(payload, { onConflict: 'user_id' });
+        error = fallbackRes.error;
+      }
       if (error) throw error;
       setSyncStatus('synced');
     } catch (err) {
@@ -679,6 +761,10 @@ async function syncFromCloud(userId) {
       // Merge covered words with remote
       COVERED.ws1 = { ...COVERED.ws1, ...(data.covered_ws1 || {}) };
       COVERED.ws2 = { ...COVERED.ws2, ...(data.covered_ws2 || {}) };
+
+      // Merge revision list with remote
+      if (data.revision_ws1) REVISION.ws1 = { ...REVISION.ws1, ...data.revision_ws1 };
+      if (data.revision_ws2) REVISION.ws2 = { ...REVISION.ws2, ...data.revision_ws2 };
 
       // Restore position & book
       if (data.current_book && (data.current_book === 'ws1' || data.current_book === 'ws2')) {

@@ -20,6 +20,9 @@
   --accent-subtle: #1e2d52;
   --green:         #2db87a;
   --red:           #e05a5a;
+  --amber:         #f59e0b;
+  --amber-dark:    #d97706;
+  --amber-subtle:  #382b14;
 
   --radius-sm: 4px;
   --radius-md: 8px;
@@ -48,6 +51,9 @@
   --accent-subtle: #e8eeff;
   --green:         #1a9e62;
   --red:           #d94040;
+  --amber:         #d97706;
+  --amber-dark:    #b45309;
+  --amber-subtle:  #fef3c7;
 }
 
 /* ── 2. RESET ── */
@@ -393,6 +399,11 @@ ul { list-style: none; }
   display: flex;
   gap: 6px;
 }
+.actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .btn {
   display: flex;
   align-items: center;
@@ -416,6 +427,26 @@ ul { list-style: none; }
   border-color: var(--green);
 }
 .btn-primary.is-covered:hover { filter: brightness(0.88); }
+.btn-warning {
+  background: var(--bg-surface);
+  color: var(--amber);
+  border-color: var(--amber);
+}
+.btn-warning:hover {
+  background: var(--amber-subtle);
+}
+.btn-warning.is-revision {
+  background: var(--amber);
+  color: #fff;
+  border-color: var(--amber);
+}
+.btn-warning.is-revision svg {
+  fill: currentColor;
+}
+.btn-warning.is-revision:hover {
+  background: var(--amber-dark);
+  border-color: var(--amber-dark);
+}
 .btn-secondary {
   background: var(--bg-surface);
   color: var(--text-2);
@@ -450,22 +481,66 @@ ul { list-style: none; }
 }
 .list-header {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
-.list-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-1);
-  letter-spacing: -0.01em;
-}
-.list-badge {
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--text-3);
-  padding: 2px 8px;
+.list-tabs {
+  display: flex;
+  background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 2px;
+  border-radius: var(--radius-md);
+  padding: 3px;
+  gap: 3px;
+}
+.list-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s var(--ease);
+  cursor: pointer;
+}
+.list-tab-btn:hover {
+  color: var(--text-1);
+}
+.list-tab-btn.active {
+  background: var(--bg);
+  color: var(--text-1);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.list-count-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--bg-hover);
+  color: var(--text-2);
+}
+.list-tab-btn.active .list-count-badge {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+#tab-list-revision.active .list-count-badge {
+  background: var(--amber-subtle);
+  color: var(--amber);
+}
+.card-revision-pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--amber-subtle);
+  color: var(--amber);
+  margin-left: 6px;
+  vertical-align: middle;
 }
 .list-empty {
   padding: 60px 0;
@@ -1039,23 +1114,34 @@ ul { list-style: none; }
 
   /* Action Buttons */
   .card-actions {
+    display: flex;
+    flex-direction: column;
     width: 100%;
     gap: 8px;
   }
+  .actions-right {
+    display: flex;
+    width: 100%;
+    gap: 8px;
+  }
+  #revision-btn, #covered-btn {
+    flex: 1;
+    height: 42px;
+    font-size: 12.5px;
+    font-weight: 600;
+    justify-content: center;
+    padding: 0 8px;
+  }
   .actions-left {
     display: flex;
+    width: 100%;
     gap: 6px;
   }
   .actions-left .btn {
-    height: 42px;
-    padding: 0 12px;
-    font-size: 12.5px;
-  }
-  #covered-btn {
     flex: 1;
-    height: 42px;
-    font-size: 13px;
-    font-weight: 600;
+    height: 38px;
+    padding: 0 10px;
+    font-size: 12px;
     justify-content: center;
   }
 
@@ -1063,10 +1149,19 @@ ul { list-style: none; }
   .desktop-hint { display: none; }
   .mobile-hint { display: inline; font-size: 11px; opacity: 0.75; }
 
-  /* Covered Words Master List */
+  /* Covered Words & Revision List */
   .list-section {
     padding: 16px 14px 40px;
     gap: 14px;
+  }
+  .list-tabs {
+    width: 100%;
+  }
+  .list-tab-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 7px 8px;
+    font-size: 12px;
   }
   .covered-grid {
     grid-template-columns: 1fr;

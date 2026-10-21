@@ -163,7 +163,7 @@
             </button>
           </div>
 
-          <!-- Actions: Shuffle + Reset on left, Mark as Covered on right -->
+          <!-- Actions: Shuffle + Reset on left, Revision + Covered on right -->
           <div class="card-actions">
             <div class="actions-left">
               <button class="btn btn-secondary" onclick="shuffleCards()" title="Shuffle words in current book">
@@ -181,16 +181,25 @@
               </button>
             </div>
 
-            <button id="covered-btn" class="btn btn-primary" onclick="markCovered()" aria-label="Mark word as covered">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-              <span id="covered-btn-text">Mark as Covered</span>
-            </button>
+            <div class="actions-right">
+              <button id="revision-btn" class="btn btn-warning" onclick="toggleRevision()" aria-label="Add word to revision list">
+                <svg id="revision-btn-icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>
+                </svg>
+                <span id="revision-btn-text">Add to Revision</span>
+              </button>
+
+              <button id="covered-btn" class="btn btn-primary" onclick="markCovered()" aria-label="Mark word as covered">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                <span id="covered-btn-text">Mark as Covered</span>
+              </button>
+            </div>
           </div>
 
           <p class="shortcuts-hint">
-            <span class="desktop-hint">Arrow keys to navigate &nbsp;&middot;&nbsp; Space to flip &nbsp;&middot;&nbsp; C to mark covered</span>
+            <span class="desktop-hint">Arrow keys to navigate &nbsp;&middot;&nbsp; Space to flip &nbsp;&middot;&nbsp; C covered &nbsp;&middot;&nbsp; R revision</span>
             <span class="mobile-hint">Swipe left / right &nbsp;&middot;&nbsp; Tap card to flip</span>
           </p>
 
@@ -207,16 +216,22 @@
     </section>
 
     <!-- ── LIST VIEW ── -->
-    <section id="list-view" class="list-section hidden" aria-label="Covered words">
+    <section id="list-view" class="list-section hidden" aria-label="Saved words lists">
 
       <div class="list-header">
-        <h2 class="list-title">Covered Words</h2>
-        <span class="list-badge" id="list-stats">0 words</span>
+        <div class="list-tabs" role="tablist" aria-label="Saved lists selection">
+          <button id="tab-list-covered" class="list-tab-btn active" onclick="switchListTab('covered')">
+            Covered Words <span class="list-count-badge" id="badge-covered-count">0</span>
+          </button>
+          <button id="tab-list-revision" class="list-tab-btn" onclick="switchListTab('revision')">
+            Revision List <span class="list-count-badge" id="badge-revision-count">0</span>
+          </button>
+        </div>
       </div>
 
       <div id="covered-list-empty" class="list-empty">
-        <p>No covered words yet.</p>
-        <p class="list-empty-sub">Mark words as covered from the flashcard view.</p>
+        <p id="list-empty-title">No covered words yet.</p>
+        <p class="list-empty-sub" id="list-empty-sub">Mark words as covered from the flashcard view.</p>
       </div>
 
       <div id="covered-list" class="covered-grid"></div>
